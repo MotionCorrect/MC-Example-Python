@@ -2,73 +2,88 @@ import json
 import requests
 import os
 from requests_oauthlib import OAuth2Session
+from flask import Flask, request, redirect, session, url_for
+from flask.json import jsonify
+import os
+from dotenv import load_dotenv
 
-client_id = os.getenv("client_id")
+load_dotenv()
+
+app = Flask(__name__)
+# These are for the app setup in AD B2C
+`client_id = os.getenv("client_id")
 client_secret = os.getenv("client_secret")
-url_redirect = os.getenv("url_redirect")
 
-url_authorization = 'https://motioncorrectb2c.b2clogin.com/motioncorrectb2c.onmicrosoft.com/b2c_1_api_authentication/oauth2/v2.0/authorize'
-url_token = 'https://motioncorrectb2c.b2clogin.com/motioncorrectb2c.onmicrosoft.com/b2c_1_api_authentication/oauth2/v2.0/token'
+# This is the URI for this local app.
+url_redirect = os.getenv("uri_redirect")
 
-api_token = os.getenv("token")
-api_url_base = os.getenv("url_api")
+b2c_url_base = os.getenv("b2c_url_base")
+url_authorization = f'{b2c_url_base}authorize'
+url_token = f'{b2c_url_base}token'
 
-MoCoAPI = OAuth2Session(client_id)
-url_authorization, state = MoCoAPI.authorization_url(url_authorization)
-print('Please go here and authorize,', url_authorization)
-
-redirect_response = input('Paste the full redirect URL here:')
-MoCoAPI.fetch_token(
-    url_token,
-    client_secret=client_secret,
-    authorization_response=redirect_response
-)
+api_url_base = os.getenv("api_url_base")
 
 
-# Fetch a protected resource, i.e. user profile
-r = github.get('https://api.github.com/user')
+@app.route("/")
+def demo():
+    """
+    Step 1: User Authorization.
+    Redirect the user/resource owner to the OAuth provider (i.e. Github)
+    using an URL with a few key OAuth parameters.
+    """
+    MoCoAPI = OAuth2Session(client_id)
+    MoCoAPI.scope = f"{client_id} offline_access"
+    MoCoAPI.redirect_uri="https://127.0.0.1:5000/callback"
 
-scope = "openid"
+    authorization_url, state = MoCoAPI.authorization_url(
+        url_authorization,
+        response_mode="query",
+        nonce="anyRandomValue",
+    )
 
-
-headers = {'Content-Type': 'application/json',
-           'Authorization': 'Bearer {0}'.format(api_token)}
-
-def get_account_info():
-
-    api_url = '{0}account'.format(api_url_base)
-
-    response = requests.get(api_url, headers=headers)
-
-    if response.status_code == 200:
-        return json.loads(response.content.decode('utf-8'))
-    else:
-        return None
-
-if __name__=="__main__":
-    if account_info is not None:
-        print("Here's your info: ")
-        for k, v in account_info['account'].items():
-            print('{0}:{1}'.format(k, v))
+    # State is used to prevent CSRF, keep this for later.
+    session['oauth_state'] = state
+    return redirect(authorization_url)
 
 
+# Step 2: User authorization, this happens on the provider.
+
+@app.route("/callback", methods=["GET"])
+def callback():
+    """ Step 3: Retrieving an access token.
+
+    The user has been redirected back from the provider to your registered
+    callback URL. With this redirection comes an authorization code included
+    in the redirect URL. We will use that to obtain an access token.
+    """
+
+    MoCoAPI = OAuth2Session(
+        client_id,
+        state=session['oauth_state'])
+    token = MoCoAPI.fetch_token(
+        url_token,
+        client_secret=client_secret,
+        authorization_response=request.url)
+
+    # At this point you can fetch protected resources but lets save
+    # the token and show how this is done from a persisted token
+    # in /profile.
+    session['oauth_token'] = token
+
+    return redirect(url_for('.profile'))
 
 
-from oauth2client.client import OAuth2WebServerFlow
-from oauth2client.tools import run
-from oauth2client.file import Storage
+@app.route("/MCAPI", methods=["GET"])
+def profile():
+    """Fetching a protected resource using an OAuth 2 token.
+    """
+    MoCoAPI = OAuth2Session(client_id, token=session['oauth_token'])
+    return jsonify(MoCoAPI.get(f'{api_url_base}').json())
 
-CLIENT_ID = '<Client ID from Google API Console>'
-CLIENT_SECRET = '<Client secret from Google API Console>'
 
+if __name__ == "__main__":
+    # This allows us to use a plain HTTP callback
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = "1"
 
-flow = OAuth2WebServerFlow(client_id=CLIENT_ID,
-                           client_secret=CLIENT_SECRET,
-                           scope='https://spreadsheets.google.com/feeds https://docs.google.com/feeds',
-                           redirect_uri='http://example.com/auth_return')
-
-storage = Storage('creds.data')
-
-credentials = run(flow, storage)
-
-print "access_token: %s" % credentials.access_token
+    app.secret_key = os.urandom(24)
+    app.run(ssl_context='adhoc', debug=True)

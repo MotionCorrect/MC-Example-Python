@@ -3,8 +3,8 @@ import requests
 import os
 
 
-api_token = os.getenv("token")
-api_url_base = os.getenv("url_api")
+api_token = os.getenv("api_token")
+api_url_base = os.getenv("api_url_base")
 
 headers = {'Content-Type': 'application/json',
            'Authorization': 'Bearer {0}'.format(api_token)}
