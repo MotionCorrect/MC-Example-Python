@@ -2,7 +2,7 @@ import json
 import requests
 import os
 from requests_oauthlib import OAuth2Session
-from flask import Flask, request, redirect, session, url_for
+from flask import Flask, request, redirect, session, url_for, render_template
 from flask.json import jsonify
 import os
 from dotenv import load_dotenv
@@ -11,7 +11,7 @@ load_dotenv()
 
 app = Flask(__name__)
 # These are for the app setup in AD B2C
-`client_id = os.getenv("client_id")
+client_id = os.getenv("client_id")
 client_secret = os.getenv("client_secret")
 
 # This is the URI for this local app.
@@ -43,6 +43,8 @@ def demo():
 
     # State is used to prevent CSRF, keep this for later.
     session['oauth_state'] = state
+
+    # Thie authorization URL is the local callback path.
     return redirect(authorization_url)
 
 
@@ -50,8 +52,8 @@ def demo():
 
 @app.route("/callback", methods=["GET"])
 def callback():
-    """ Step 3: Retrieving an access token.
-
+    """
+    Step 3: Retrieving an access token.
     The user has been redirected back from the provider to your registered
     callback URL. With this redirection comes an authorization code included
     in the redirect URL. We will use that to obtain an access token.
@@ -69,15 +71,34 @@ def callback():
     # the token and show how this is done from a persisted token
     # in /profile.
     session['oauth_token'] = token
+    print(f"Received Access token: {token}")
 
-    return redirect(url_for('.profile'))
+    import datetime
 
+
+    with open("./access.json", "w") as f:
+        f.write(json.dumps(token, indent=4))
+
+    return redirect(url_for('.aknowledgement'))
+
+@app.route("/aknowledgement", methods=["GET"])
+def aknowledgement():
+    """
+    Tell the user that
+    :return:
+    """
+    content="Thanks. Access token has been saved properly."
+    return render_template("aknowledgement.html", content=content)
 
 @app.route("/MCAPI", methods=["GET"])
 def profile():
-    """Fetching a protected resource using an OAuth 2 token.
+    """
+    Step 4: Fetching a protected resource using an OAuth 2 token.
     """
     MoCoAPI = OAuth2Session(client_id, token=session['oauth_token'])
+
+
+
     return jsonify(MoCoAPI.get(f'{api_url_base}').json())
 
 
