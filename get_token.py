@@ -1,9 +1,6 @@
 import json
-import requests
-import os
 from requests_oauthlib import OAuth2Session
 from flask import Flask, request, redirect, session, url_for, render_template
-from flask.json import jsonify
 import os
 from dotenv import load_dotenv
 
@@ -25,7 +22,7 @@ api_url_base = os.getenv("api_url_base")
 
 
 @app.route("/")
-def demo():
+def user_authorization():
     """
     Step 1: User Authorization.
     Redirect the user/resource owner to the OAuth provider (i.e. Github)
@@ -33,7 +30,7 @@ def demo():
     """
     MoCoAPI = OAuth2Session(client_id)
     MoCoAPI.scope = f"{client_id} offline_access"
-    MoCoAPI.redirect_uri="https://127.0.0.1:5000/callback"
+    MoCoAPI.redirect_uri = url_redirect
 
     authorization_url, state = MoCoAPI.authorization_url(
         url_authorization,
@@ -53,7 +50,7 @@ def demo():
 @app.route("/callback", methods=["GET"])
 def callback():
     """
-    Step 3: Retrieving an access token.
+    Step 3: Retrieving an access/id/refresh token.
     The user has been redirected back from the provider to your registered
     callback URL. With this redirection comes an authorization code included
     in the redirect URL. We will use that to obtain an access token.
@@ -73,9 +70,7 @@ def callback():
     session['oauth_token'] = token
     print(f"Received Access token: {token}")
 
-    import datetime
-
-
+    # Write out the token.
     with open("./access.json", "w") as f:
         f.write(json.dumps(token, indent=4))
 
@@ -84,22 +79,12 @@ def callback():
 @app.route("/aknowledgement", methods=["GET"])
 def aknowledgement():
     """
-    Tell the user that
+    Step 4: This simple message aknowledge the credential has been properly obtained.
+    Tell the user that a token has been properly obtained
     :return:
     """
     content="Thanks. Access token has been saved properly."
     return render_template("aknowledgement.html", content=content)
-
-@app.route("/MCAPI", methods=["GET"])
-def profile():
-    """
-    Step 4: Fetching a protected resource using an OAuth 2 token.
-    """
-    MoCoAPI = OAuth2Session(client_id, token=session['oauth_token'])
-
-
-
-    return jsonify(MoCoAPI.get(f'{api_url_base}').json())
 
 
 if __name__ == "__main__":

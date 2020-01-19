@@ -1,0 +1,7 @@
+
+# This is the example .env file storing the criticial settings to be used by the main program.
+api_url_base=https://YYY
+b2c_url_base=https://YYY.b2clogin.com/YYY.onmicrosoft.com/b2c_1_YYY/oauth2/v2.0/
+client_id=YYY
+client_secret=YYY
+uri_redirect=https://127.0.0.1:5000/callback
